@@ -154,14 +154,14 @@
 
 
      /* coin-or */
-     bonmin = pkgs.callPackage ./bonmin.nix {};
-     cbc = pkgs.callPackage ./cbc.nix {};
-     cgl = pkgs.callPackage ./cgl.nix {};
-     clp = pkgs.callPackage ./clp.nix {};
-     coinUtils = pkgs.callPackage ./coinUtils.nix {};
-     couenne = pkgs.callPackage ./couenne.nix {};
-     ipopt = pkgs.callPackage ./ipopt.nix {};
-     osi = pkgs.callPackage ./osi.nix {};
+     bonmin = pkgs.callPackage ./coin-or/bonmin.nix {};
+     cbc = pkgs.callPackage ./coin-or/cbc.nix {};
+     cgl = pkgs.callPackage ./coin-or/cgl.nix {};
+     clp = pkgs.callPackage ./coin-or/clp.nix {};
+     coinUtils = pkgs.callPackage ./coin-or/coinUtils.nix {};
+     couenne = pkgs.callPackage ./coin-or/couenne.nix {};
+     ipopt = pkgs.callPackage ./coin-or/ipopt.nix {};
+     osi = pkgs.callPackage ./coin-or/osi.nix {};
 
      nlopt = pkgs.callPackage ./nlopt.nix {}; /* minor variation on the existing nlopt package (remove --with-cxx) */
 
