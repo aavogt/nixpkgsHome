@@ -109,7 +109,7 @@
               });
 
       singletons = override "singletons" (if (versionOlder "7.8" self.ghc.version)
-          then {} /* hackage version works with 7.8
+          then {} /* hackage version works with 7.8 */
           else {
             version = "0.10.0";
             sha256 = "14vnkw9ihrs3xg3lhb3wkyfz59lsaz4c3iqh3hqy7x9gmifgggwr";
