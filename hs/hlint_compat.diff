@@ -1,0 +1,318 @@
+diff -ru hlint-1.9.3/src/Hint/Bracket.hs hlint-1.9.3_fixed/src/Hint/Bracket.hs
+--- hlint-1.9.3/src/Hint/Bracket.hs	2014-08-10 17:30:27.165274367 -0400
++++ hlint-1.9.3_fixed/src/Hint/Bracket.hs	2014-08-10 22:13:24.033458086 -0400
+@@ -94,8 +94,10 @@
+ 
+ 
+ fieldDecl :: FieldDecl S -> [Idea]
++{- XXX
+ fieldDecl o@(FieldDecl a b (UnBangedTy c (TyParen _ d)))
+     = [warn "Redundant bracket" o (FieldDecl a b (UnBangedTy c d))]
++    -}
+ fieldDecl _ = []
+ 
+ 
+diff -ru hlint-1.9.3/src/Hint/Extensions.hs hlint-1.9.3_fixed/src/Hint/Extensions.hs
+--- hlint-1.9.3/src/Hint/Extensions.hs	2014-08-10 17:30:27.165274367 -0400
++++ hlint-1.9.3_fixed/src/Hint/Extensions.hs	2014-08-10 22:25:23.025023398 -0400
+@@ -122,9 +122,8 @@
+           f TypQuote{} = True
+           f _ = False
+ used ForeignFunctionInterface = hasT (un :: CallConv S)
+-used PatternGuards = hasS f1 & hasS f2
++used PatternGuards = hasS f1
+     where f1 (GuardedRhs _ xs _) = g xs
+-          f2 (GuardedAlt _ xs _) = g xs
+           g [] = False
+           g [Qualifier{}] = False
+           g _ = True
+@@ -178,10 +177,13 @@
+         g dn ds = if isNewType dn then (xs,[]) else ([],xs)
+             where xs = maybe [] (map h . fromDeriving) ds
+ 
+-        h (IHead _ a _) = prettyPrint $ unqual a
+-        h (IHInfix _ _ a _) = prettyPrint $ unqual a
+-        h (IHParen _ a) = h a
++        h (IRule _ _ _ a) = h1 a
++        h (IParen _ a) = h a
+ 
++        h1 (IHCon _ a) = prettyPrint $ unqual a
++        h1 (IHInfix _ _ a) = prettyPrint $ unqual a
++        h1 (IHParen _ a) = h1 a
++        h1 (IHApp _ a _) = h1 a
+ 
+ un = undefined
+ 
+diff -ru hlint-1.9.3/src/Hint/Import.hs hlint-1.9.3_fixed/src/Hint/Import.hs
+--- hlint-1.9.3/src/Hint/Import.hs	2014-08-10 17:30:27.165274367 -0400
++++ hlint-1.9.3_fixed/src/Hint/Import.hs	2014-08-10 22:18:04.458848652 -0400
+@@ -125,7 +125,7 @@
+     = [rawIdea Warning "Use hierarchical imports" (toSrcSpan $ ann i) (ltrim $ prettyPrint i) (
+           Just $ unlines $ map (ltrim . prettyPrint)
+           [f "System.IO" Nothing, f "System.IO.Error" Nothing
+-          ,f "Control.Exception" $ Just $ ImportSpecList an False [IVar an $ toNamed x | x <- ["bracket","bracket_"]]]) []]
++          ,f "Control.Exception" $ Just $ ImportSpecList an False [IVar an (NoNamespace an) (toNamed x) | x <- ["bracket","bracket_"]]]) []]
+     where f a b = (desugarQual i){importModule=ModuleName an a, importSpecs=b}
+ 
+ hierarchy _ = []
+diff -ru hlint-1.9.3/src/Hint/Monad.hs hlint-1.9.3_fixed/src/Hint/Monad.hs
+--- hlint-1.9.3/src/Hint/Monad.hs	2014-08-10 17:30:27.165274367 -0400
++++ hlint-1.9.3_fixed/src/Hint/Monad.hs	2014-08-10 22:09:29.788296641 -0400
+@@ -96,7 +96,7 @@
+         vs = concatMap pvars [p | Generator _ p _ <- xs]
+         mkLet (Generator _ (view -> PVar_ p) (fromRet -> Just y))
+             | p `notElem` vars y, p `notElem` delete p vs
+-            = LetStmt an $ BDecls an [PatBind an (toNamed p) Nothing (UnGuardedRhs an y) Nothing]
++            = LetStmt an $ BDecls an [PatBind an (toNamed p) (UnGuardedRhs an y) Nothing]
+         mkLet x = x
+ 
+ fromRet (Paren _ x) = fromRet x
+diff -ru hlint-1.9.3/src/Hint/Naming.hs hlint-1.9.3_fixed/src/Hint/Naming.hs
+--- hlint-1.9.3/src/Hint/Naming.hs	2014-08-10 17:30:27.165274367 -0400
++++ hlint-1.9.3_fixed/src/Hint/Naming.hs	2014-08-10 22:14:32.873799460 -0400
+@@ -51,7 +51,7 @@
+ shorten :: Decl_ -> Decl_
+ shorten x = case x of
+     FunBind sl (Match a b c d _:_) -> FunBind sl [f (Match a b c) d]
+-    PatBind a b c d _ -> f (PatBind a b c) d
++    PatBind a b d _ -> f (PatBind a b) d
+     x -> x
+     where
+         dots = Var an $ UnQual an $ Ident an "..." -- Must be an Ident, not a Symbol
+@@ -65,7 +65,7 @@
+     PatBind{} -> name
+     TypeDecl{} -> name
+     DataDecl _ _ _ _ cons _ -> name ++ [fromNamed x | QualConDecl _ _ _ x <- cons, x <- f x]
+-    GDataDecl _ _ _ _ _ cons _ -> name ++ [fromNamed x | GadtDecl _ x _ <- cons]
++    GDataDecl _ _ _ _ _ cons _ -> name ++ [fromNamed x | GadtDecl _ x _ _ <- cons]
+     TypeFamDecl{} -> name
+     DataFamDecl{} -> name
+     ClassDecl{} -> name
+diff -ru hlint-1.9.3/src/Hint/Structure.hs hlint-1.9.3_fixed/src/Hint/Structure.hs
+--- hlint-1.9.3/src/Hint/Structure.hs	2014-08-10 17:30:27.161274359 -0400
++++ hlint-1.9.3_fixed/src/Hint/Structure.hs	2014-08-10 22:17:04.310550589 -0400
+@@ -95,12 +95,12 @@
+ asPattern :: Decl_ -> [(Pattern, String -> Pattern -> Idea)]
+ asPattern x = concatMap decl (universeBi x) ++ concatMap alt (universeBi x)
+     where
+-        decl o@(PatBind a pat b rhs bind) = [(Pattern [pat] rhs bind, \msg (Pattern [pat] rhs bind) -> warn msg o $ PatBind a pat b rhs bind)]
++        decl o@(PatBind a pat rhs bind) = [(Pattern [pat] rhs bind, \msg (Pattern [pat] rhs bind) -> warn msg o $ PatBind a pat rhs bind)]
+         decl (FunBind _ xs) = map match xs
+         decl _ = []
+         match o@(Match a b pat rhs bind) = (Pattern pat rhs bind, \msg (Pattern pat rhs bind) -> warn msg o $ Match a b pat rhs bind)
+         match o@(InfixMatch a p b ps rhs bind) = (Pattern (p:ps) rhs bind, \msg (Pattern (p:ps) rhs bind) -> warn msg o $ InfixMatch a p b ps rhs bind)
+-        alt o@(Alt a pat rhs bind) = [(Pattern [pat] (fromGuardedAlts rhs) bind, \msg (Pattern [pat] rhs bind) -> warn msg o $ Alt a pat (toGuardedAlts rhs) bind)]
++        alt o@(Alt a pat rhs bind) = [(Pattern [pat] rhs bind, \msg (Pattern [pat] rhs bind) -> warn msg o $ Alt a pat rhs bind)]
+ 
+ 
+ 
+@@ -125,7 +125,7 @@
+ 
+ 
+ expHint :: Exp_ -> [Idea]
+-expHint o@(Case _ _ [Alt _ PWildCard{} (UnGuardedAlt _ e) Nothing]) = [warn "Redundant case" o e]
+-expHint o@(Case _ (Var _ x) [Alt _ (PVar _ y) (UnGuardedAlt _ e) Nothing])
++expHint o@(Case _ _ [Alt _ PWildCard{} e Nothing]) = [warn "Redundant case" o e]
++expHint o@(Case _ (Var _ x) [Alt _ (PVar _ y) e Nothing])
+     | x =~= UnQual an y = [warn "Redundant case" o e]
+ expHint _ = []
+diff -ru hlint-1.9.3/src/Hint/Util.hs hlint-1.9.3_fixed/src/Hint/Util.hs
+--- hlint-1.9.3/src/Hint/Util.hs	2014-08-10 17:30:27.161274359 -0400
++++ hlint-1.9.3_fixed/src/Hint/Util.hs	2014-08-10 22:06:05.883285414 -0400
+@@ -67,7 +67,7 @@
+ --   Mainly so that later stages can match on fewer alternatives.
+ simplifyExp :: Exp_ -> Exp_
+ simplifyExp (InfixApp _ x dol y) | isDol dol = App an x (paren y)
+-simplifyExp (Let _ (BDecls _ [PatBind _ (view -> PVar_ x) Nothing (UnGuardedRhs _ y) Nothing]) z)
++simplifyExp (Let _ (BDecls _ [PatBind _ (view -> PVar_ x) (UnGuardedRhs _ y) Nothing]) z)
+     | x `notElem` vars y && length [() | UnQual _ a <- universeS z, prettyPrint a == x] <= 1 = transform f z
+     where f (view -> Var_ x') | x == x' = paren y
+           f x = x
+diff -ru hlint-1.9.3/src/HSE/FreeVars.hs hlint-1.9.3_fixed/src/HSE/FreeVars.hs
+--- hlint-1.9.3/src/HSE/FreeVars.hs	2014-08-10 17:30:27.161274359 -0400
++++ hlint-1.9.3_fixed/src/HSE/FreeVars.hs	2014-08-10 18:00:30.806218110 -0400
+@@ -103,13 +103,6 @@
+ instance FreeVars [Alt S] where
+     freeVars = mconcat . map freeVars
+ 
+-instance FreeVars (GuardedAlts S) where
+-    freeVars (UnGuardedAlt _ x) = freeVars x
+-    freeVars (GuardedAlts _ xs) = mconcat $ map freeVars xs
+-
+-instance FreeVars (GuardedAlt S) where
+-    freeVars (GuardedAlt _ stmt exp) = inFree stmt exp
+-
+ instance FreeVars (Rhs S) where
+     freeVars (UnGuardedRhs _ x) = freeVars x
+     freeVars (GuardedRhss _ xs) = mconcat $ map freeVars xs
+@@ -147,7 +140,7 @@
+ 
+ instance AllVars (Decl S) where
+     allVars (FunBind _ m) = allVars m
+-    allVars (PatBind _ pat _ rhs bind) = allVars pat `mappend` freeVars_ (inFree bind rhs)
++    allVars (PatBind _ pat rhs bind) = allVars pat `mappend` freeVars_ (inFree bind rhs)
+     allVars _ = mempty
+ 
+ instance AllVars [Match S] where
+diff -ru hlint-1.9.3/src/HSE/Match.hs hlint-1.9.3_fixed/src/HSE/Match.hs
+--- hlint-1.9.3/src/HSE/Match.hs	2014-08-10 17:30:27.161274359 -0400
++++ hlint-1.9.3_fixed/src/HSE/Match.hs	2014-08-10 22:01:29.649915666 -0400
+@@ -131,8 +131,8 @@
+     toNamed = error "No toNamed for Match"
+ 
+ instance Named (DeclHead S) where
+-    fromNamed (DHead _ x _) = fromNamed x
+-    fromNamed (DHInfix _ _ x _) = fromNamed x
++    fromNamed (DHead _ x) = fromNamed x
++    fromNamed (DHInfix _ _ x) = fromNamed x
+     fromNamed (DHParen _ x) = fromNamed x
+     toNamed = error "No toNamed for DeclHead"
+ 
+@@ -143,7 +143,7 @@
+     fromNamed (TypeFamDecl _ name _) = fromNamed name
+     fromNamed (DataFamDecl _ _ name _) = fromNamed name
+     fromNamed (ClassDecl _ _ name _ _) = fromNamed name
+-    fromNamed (PatBind _ (PVar _ name) _ _ _) = fromNamed name
++    fromNamed (PatBind _ (PVar _ name) _ _) = fromNamed name
+     fromNamed (FunBind _ (name:_)) = fromNamed name
+     fromNamed (ForImp _ _ _ _ name _) = fromNamed name
+     fromNamed (ForExp _ _ _ name _) = fromNamed name
+diff -ru hlint-1.9.3/src/HSE/Scope.hs hlint-1.9.3_fixed/src/HSE/Scope.hs
+--- hlint-1.9.3/src/HSE/Scope.hs	2014-08-10 17:30:27.161274359 -0400
++++ hlint-1.9.3_fixed/src/HSE/Scope.hs	2014-08-10 22:04:43.786878267 -0400
+@@ -43,7 +43,7 @@
+ scopeCreate xs = Scope $ [prelude | not $ any isPrelude res] ++ res
+     where
+         res = [x | x <- moduleImports xs, importPkg x /= Just "hint"]
+-        prelude = ImportDecl an (ModuleName an "Prelude") False False Nothing Nothing Nothing
++        prelude = ImportDecl an (ModuleName an "Prelude") False False False Nothing Nothing Nothing
+         isPrelude x = fromModuleName (importModule x) == "Prelude"
+ 
+ 
+@@ -96,7 +96,7 @@
+             where ms = map g xs
+         
+         g :: ImportSpec S -> Maybe Bool -- does this import cover the name x
+-        g (IVar _ y) = Just $ x =~= y
++        g (IVar _ _ y) = Just $ x =~= y
+         g (IAbs _ y) = Just $ x =~= y
+         g (IThingAll _ y) = if x =~= y then Just True else Nothing
+         g (IThingWith _ y ys) = Just $ x `elem_` (y : map fromCName ys)
+diff -ru hlint-1.9.3/src/HSE/Util.hs hlint-1.9.3_fixed/src/HSE/Util.hs
+--- hlint-1.9.3/src/HSE/Util.hs	2014-08-10 17:30:27.161274359 -0400
++++ hlint-1.9.3_fixed/src/HSE/Util.hs	2014-08-10 22:34:50.323836472 -0400
+@@ -1,3 +1,4 @@
++{-# LANGUAGE ScopedTypeVariables #-}
+ {-# LANGUAGE FlexibleContexts #-}
+ 
+ module HSE.Util where
+@@ -68,7 +69,7 @@
+ fromTyParen (TyParen _ x) = fromTyParen x
+ fromTyParen x = x
+ 
+-fromDeriving :: Deriving s -> [InstHead s]
++fromDeriving :: Deriving s -> [InstRule s]
+ fromDeriving (Deriving _ x) = x
+ 
+ -- is* :: Exp_ -> Bool
+@@ -168,29 +169,21 @@
+ 
+ 
+ toFunBind :: Decl s -> Decl s
+-toFunBind (PatBind s (PVar _ name) _ bod bind) = FunBind s [Match s name [] bod bind]
++toFunBind (PatBind s (PVar _ name) bod bind) = FunBind s [Match s name [] bod bind]
+ toFunBind x = x
+ 
+ 
+-fromGuardedAlts :: GuardedAlts s -> Rhs s
+-fromGuardedAlts (UnGuardedAlt s x) = UnGuardedRhs s x
+-fromGuardedAlts (GuardedAlts s xs) = GuardedRhss s [GuardedRhs a b c | GuardedAlt a b c <- xs]
+-
+-toGuardedAlts :: Rhs s -> GuardedAlts s
+-toGuardedAlts (UnGuardedRhs s x) = UnGuardedAlt s x
+-toGuardedAlts (GuardedRhss s xs) = GuardedAlts s [GuardedAlt a b c | GuardedRhs a b c <- xs]
+-
+-
+ -- case and if both have branches, nothing else does
+ replaceBranches :: Exp s -> ([Exp s], [Exp s] -> Exp s)
+ replaceBranches (If s a b c) = ([b,c], \[b,c] -> If s a b c)
+ replaceBranches (Case s a bs) = (concatMap f bs, Case s a . g bs)
+     where
+-        f (Alt _ _ (UnGuardedAlt _ x) _) = [x]
+-        f (Alt _ _ (GuardedAlts _ xs) _) = [x | GuardedAlt _ _ x <- xs]
+-        g (Alt s1 a (UnGuardedAlt s2 _) b:rest) (x:xs) = Alt s1 a (UnGuardedAlt s2 x) b : g rest xs
+-        g (Alt s1 a (GuardedAlts s2 ns) b:rest) xs =
+-                Alt s1 a (GuardedAlts s2 [GuardedAlt a b x | (GuardedAlt a b _,x) <- zip ns as]) b : g rest bs
++        f (Alt _ _ (UnGuardedRhs _ x) _) = [x]
++        f (Alt _ _ (GuardedRhss _ xs) _) = [x | GuardedRhs _ _ x <- xs]
++
++        g (Alt s1 a (UnGuardedRhs s2 _) b:rest) (x:xs) = Alt s1 a (UnGuardedRhs s2 x) b : g rest xs
++        g (Alt s1 a (GuardedRhss l2 ns) b:rest) xs =
++                Alt s1 a (GuardedRhss l2 [GuardedRhs a b x | (GuardedRhs a b _,x) <- zip ns as]) b : g rest bs
+             where (as,bs) = splitAt (length ns) xs
+         g [] [] = []
+ replaceBranches x = ([], \[] -> x)
+diff -ru hlint-1.9.3/src/Settings.hs hlint-1.9.3_fixed/src/Settings.hs
+--- hlint-1.9.3/src/Settings.hs	2014-08-10 17:30:27.157274326 -0400
++++ hlint-1.9.3_fixed/src/Settings.hs	2014-08-10 22:07:18.983647921 -0400
+@@ -163,7 +163,7 @@
+ 
+ readSetting s x | "test" `isPrefixOf` map toLower (fromNamed x) = []
+ readSetting s (AnnPragma _ x) | Just y <- readPragma x = [SettingClassify y]
+-readSetting s (PatBind an (PVar _ name) _ bod bind) = readSetting s $ FunBind an [Match an name [] bod bind]
++readSetting s (PatBind an (PVar _ name) bod bind) = readSetting s $ FunBind an [Match an name [] bod bind]
+ readSetting s (FunBind an xs) | length xs /= 1 = concatMap (readSetting s . FunBind an . return) xs
+ readSetting s (SpliceDecl an (App _ (Var _ x) (Lit _ y))) = readSetting s $ FunBind an [Match an (toNamed $ fromNamed x) [PLit an y] (UnGuardedRhs an $ Lit an $ String an "" "") Nothing]
+ readSetting s x@InfixDecl{} = map Infix $ getFixity x
+@@ -189,9 +189,9 @@
+ 
+ readSide :: [Decl_] -> (Maybe Exp_, [Note])
+ readSide = foldl f (Nothing,[])
+-    where f (Nothing,notes) (PatBind _ PWildCard{} Nothing (UnGuardedRhs _ side) Nothing) = (Just side, notes)
+-          f (Nothing,notes) (PatBind _ (fromNamed -> "side") Nothing (UnGuardedRhs _ side) Nothing) = (Just side, notes)
+-          f (side,[]) (PatBind _ (fromNamed -> "note") Nothing (UnGuardedRhs _ note) Nothing) = (side,g note)
++    where f (Nothing,notes) (PatBind _ PWildCard{} (UnGuardedRhs _ side) Nothing) = (Just side, notes)
++          f (Nothing,notes) (PatBind _ (fromNamed -> "side") (UnGuardedRhs _ side) Nothing) = (Just side, notes)
++          f (side,[]) (PatBind _ (fromNamed -> "note") (UnGuardedRhs _ note) Nothing) = (side,g note)
+           f _ x = errorOn x "bad side condition"
+ 
+           g (Lit _ (String _ x _)) = [Note x]
+@@ -258,7 +258,7 @@
+ 
+ findSetting :: (Name S -> QName S) -> Decl_ -> [Decl_]
+ findSetting qual (InstDecl _ _ _ (Just xs)) = concatMap (findSetting qual) [x | InsDecl _ x <- xs]
+-findSetting qual (PatBind _ (PVar _ name) Nothing (UnGuardedRhs _ bod) Nothing) = findExp (qual name) [] bod
++findSetting qual (PatBind _ (PVar _ name) (UnGuardedRhs _ bod) Nothing) = findExp (qual name) [] bod
+ findSetting qual (FunBind _ [InfixMatch _ p1 name ps rhs bind]) = findSetting qual $ FunBind an [Match an name (p1:ps) rhs bind]
+ findSetting qual (FunBind _ [Match _ name ps (UnGuardedRhs _ bod) Nothing]) = findExp (qual name) [] $ Lambda an ps bod
+ findSetting _ x@InfixDecl{} = [x]
+@@ -273,7 +273,7 @@
+ findExp name vs Var{} = []
+ findExp name vs (InfixApp _ x dot y) | isDot dot = findExp name (vs++["_hlint"]) $ App an x $ Paren an $ App an y (toNamed "_hlint")
+ 
+-findExp name vs bod = [PatBind an (toNamed "warn") Nothing (UnGuardedRhs an $ InfixApp an lhs (toNamed "==>") rhs) Nothing]
++findExp name vs bod = [PatBind an (toNamed "warn") (UnGuardedRhs an $ InfixApp an lhs (toNamed "==>") rhs) Nothing]
+     where
+         lhs = g $ transform f bod
+         rhs = apps $ Var an name : map snd rep
+diff -ru hlint-1.9.3/src/Test/Translate.hs hlint-1.9.3_fixed/src/Test/Translate.hs
+--- hlint-1.9.3/src/Test/Translate.hs	2014-08-10 17:30:27.161274359 -0400
++++ hlint-1.9.3_fixed/src/Test/Translate.hs	2014-08-10 22:09:21.084253217 -0400
+@@ -63,7 +63,7 @@
+     ["import HLint_TypeCheck hiding(main)"
+     ,"main = return ()"] ++
+     ["{-# LINE " ++ show (startLine $ ann rhs) ++ " " ++ show (fileName $ ann rhs) ++ " #-}\n" ++
+-     prettyPrint (PatBind an (toNamed $ "test" ++ show i) Nothing bod Nothing)
++     prettyPrint (PatBind an (toNamed $ "test" ++ show i) bod Nothing)
+     | (i, HintRule _ _ _ lhs rhs side _) <- zip [1..] hints, "noTypeCheck" `notElem` vars (maybeToList side)
+     , let vs = map toNamed $ nub $ filter isUnifyVar $ vars lhs ++ vars rhs
+     , let inner = InfixApp an (Paren an lhs) (toNamed "==>") (Paren an rhs)
+@@ -77,7 +77,7 @@
+ toQuickCheck hints =
+     ["import HLint_QuickCheck hiding(main)"
+     ,"default(Maybe Bool,Int,Dbl)"
+-    ,prettyPrint $ PatBind an (toNamed "main") Nothing (UnGuardedRhs an $ toNamed "withMain" $$ Do an tests) Nothing]
++    ,prettyPrint $ PatBind an (toNamed "main") (UnGuardedRhs an $ toNamed "withMain" $$ Do an tests) Nothing]
+     where
+         str x = Lit an $ String an x (show x)
+         int x = Lit an $ Int an (toInteger x) (show x)

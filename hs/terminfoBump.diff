@@ -1,0 +1,12 @@
+Common subdirectories: terminfo-0.4.0.0/System and terminfo-0.4.0.1/System
+diff -u terminfo-0.4.0.0/terminfo.cabal terminfo-0.4.0.1/terminfo.cabal
+--- terminfo-0.4.0.0/terminfo.cabal	2014-08-20 01:25:59.098722284 -0400
++++ terminfo-0.4.0.1/terminfo.cabal	2014-08-20 01:26:16.134806792 -0400
+@@ -1,6 +1,6 @@
+ Name:           terminfo
+ Cabal-Version:  >=1.10
+-Version:        0.4.0.0
++Version:        0.4.0.1
+ Category:       User Interfaces
+ License:        BSD3
+ License-File:   LICENSE

@@ -1,0 +1,31 @@
+{ cabal, algebra, dataInterval, deepseq, filepath, finiteField
+, hashable, heaps, HUnit, lattices, logicTPTP, mtl, multiset
+, OptDir, parsec, parseDimacs, prettyclass, primes, queue
+, QuickCheck, random, stm, testFramework, testFrameworkHunit
+, testFrameworkQuickcheck2, testFrameworkTh, time, typeLevelNumbers
+, unboundedDelays, vectorSpace
+}:
+
+cabal.mkDerivation (self: {
+  pname = "toysolver";
+  version = "0.0.6";
+  sha256 = "1405kx7rf99pw89yn8ni506zc748sari7x2gbxs270wz19avs4wc";
+  isLibrary = true;
+  isExecutable = true;
+  buildDepends = [
+    algebra dataInterval deepseq filepath finiteField hashable heaps
+    lattices logicTPTP mtl multiset OptDir parsec parseDimacs
+    prettyclass primes queue random stm time typeLevelNumbers
+    unboundedDelays vectorSpace
+  ];
+  testDepends = [
+    dataInterval finiteField HUnit OptDir prettyclass QuickCheck stm
+    testFramework testFrameworkHunit testFrameworkQuickcheck2
+    testFrameworkTh vectorSpace
+  ];
+  meta = {
+    description = "Assorted decision procedures for SAT, Max-SAT, PB, MIP, etc";
+    license = self.stdenv.lib.licenses.bsd3;
+    platforms = self.ghc.meta.platforms;
+  };
+})
