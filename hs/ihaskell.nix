@@ -21,7 +21,7 @@
                                             (builtins.toString p))); };
 
 
-  in {
+  ihaskellAll = {
     ghcParser           = callPackage ./ihaskell/ghc-parser.nix { src = src "/ghc-parser"; } ;
 
 
@@ -39,22 +39,6 @@
     ihaskellRlangqq     = callD ./ihaskell/ihaskell-rlangqq.nix ;
     ihaskellWidgets     = callD ./ihaskell/ihaskell-widgets.nix ;
 
-    /* there ought to be a better way to refer to all of the other packages here:
+  }; in ihaskellAll // { ihaskellAll =
       let attrValues = set: map (name: builtins.getAttr name set) (builtins.attrNames set);
-      in attrValues(ihaskellAll)
-
-      works, but then you have to use it:
-
-        haskellPackages.ghcWithPackages (x: with x; ihaskellAll ++ [ xmonad cmdargs ])
-
-      instead of the more natural
-
-        haskellPackages.ghcWithPackages (x: with x; [ihaskellAll xmonad cmdargs])
-
-
-      XXX see comment in nixpkgs/pkgs/development/compilers/ghc/with-packages.nix
-      regarding environment variables needed
-
-    */
-    ihaskellAll = callPackage ./ihaskell/ihaskellAll/ihaskellAll.nix { };
-  }
+      in attrValues(ihaskellAll); }

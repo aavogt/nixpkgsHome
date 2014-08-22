@@ -197,6 +197,7 @@
         ignoreCollisions = true; /* the first one wins */
         paths = [
          (withGhc 783 (theGhc : with theGhc;
+                 ihaskellAll ++
                 [ad
                  Adaptive
                  ansiWlPprint
@@ -233,7 +234,6 @@
                  hspec
                  hxt
                  hxtXpath
-                 ihaskellAll
                  ipoptHs
                  ipprint
                  KdTree
@@ -272,9 +272,11 @@
                 ]))
 
          (withGhc 763 (theGhc : with theGhc;
+                 ihaskellAll ++
                 [xmonadDyre
                  xmonadContribDyre
                  HList
+                 plugins
                  /* toysolver */ ]))
          (withGhc 742 (theGhc : with theGhc;
                 [xmonadDyre
